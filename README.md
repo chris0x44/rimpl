@@ -1,6 +1,8 @@
-# rimpl - Redacted Implementation
+# Redacted Implementation - An alternative to PImpl
 
-This approach is a variation of the [pimpl idiom (Pointer to Implementation)](https://en.cppreference.com/w/cpp/language/pimpl) that avoids heap allocations by storing the `impl`-instance in a fixed-size buffer in the owning class.
+This approach is a variation of the [pimpl idiom](https://en.cppreference.com/w/cpp/language/pimpl) that avoids heap allocations by storing the `impl`-instance in a fixed-size buffer in the owning class.
+
+Requires `C++11` or higher.
 
 Reasons why you may want to do this:
 - Heap allocations are not allowed in your project
@@ -72,25 +74,34 @@ Source
 >```
 
 
-## Buffer sizes and boundary checks
-A potantial issue with manually providing buffer sizes is that you may end up with the wrong size.
+## Buffer-sizes and boundary checks
+A potantial issue with manually providing buffer-sizes is that you may end up with the wrong size.
 If the buffer was too small, you'd end up with memory corruption and undefined behavior and nobody wants this.
-To prevent his issue, there is a compile-time check to ensure that the buffer is guaranteed to be of sufficient size.
+
+To prevent his issue, **there is a compile-time check** to ensure that the buffer is sufficiently large.
 
 There are no hints or warnings for too large buffer-sizes.
-Since compilers and platforms may have diffrering layouts and use of `rimpl` is intended to be portable, there is "one true buffer size".
+Since compilers and platforms may have diffrering layouts and use of `rimpl` is intended to be portable, there is "one true buffer-size".
 Only sufficient size or not.
 
 > [!tip]
-> Providing a somewhate larger buffer size is a good way to future-proof for extension of the redacted type.
+> Providing a somewhate larger buffer-size is a good way to future-proof for extension of the redacted type.
 > Especially if ABI-stability is important to you.
 
-### How to determine buffer size?
+### How to determine buffer-size?
 The simplest way is to use the safeguard against buffer overflow.
-Just provide a 1 for buffer-size and the compiler will give you an error that looks something like this:
+Just provide a 1 for buffer-size and the compiler will give you an error that looks something like this in MSCV:
+
 ```cpp
 static_assert failed: 'Buffer is too small for type size:  Rimpl::Needs_at_least<struct Rimpl::Type_size<8> >::as_buffer'
 ```
+
+Or in GCC:
+
+```cpp
+rimpl_implement.hpp: In instantiation of 'static constexpr void Rimpl::Needs_at_least<Type>::as_buffer(Buffer) [with Buffer = Rimpl::Type_size<1>; Type = Rimpl::Type_size<8>]':
+```
+
 I know that we only look at type information if we really can't help it, but in this case it pays to take a closer look.
 The buffer-check is written in a way that the type error actually reads like a sentence, if you ignore the funny punctuation.
 Here it says that it a buffer of at least 8 byte is required to fit a type with size of 8.
@@ -98,25 +109,26 @@ Here it says that it a buffer of at least 8 byte is required to fit a type with 
 
 ## Trade-offs
 Similar to the _pimpl idiom_ this approach comes with a collection of trade-offs.
-Check to see if this fits your problem or another approach may be more helpful.
+Check to see if they your problem or another approach may be more helpful.
 
-### Manual maintenance of the underlying buffer size.
-Since the compiler has no way to determine the required size in the class declaration, we have to provide a fitting size manually.
+### Manual setting of buffer-size.
+Since the compiler has no way to determine the required size in the class declaration, we have to manually provide a fitting size.
 
-This adds a slightly higher maintenace effort and a very tiny chance of an excessive buffer size being supplied.
+As mentioned above, the error-case of not enough memory is caught at compile-time, so we don't count it as trade-off.
+But nevertheless we have a slightly higher maintenace effort and a rather tiny chance of someone setting an excessive buffer-size.
 
 
-### Slightly larger memory footprint due to alignment requirements
+### Slightly larger memory footprint
 The internal buffer may require a bit more memory than the redacted object itself.
-Reason is that the buffer is always aligned to match maximum alignment requirements.
+Reason is that the buffer is always aligned to match maximum alignment requirements, which may add a small overhead to the overall object size.
 
 Usually this should not be that much since the redacted type often has higher alignment needs and arrays of `rimpl`-ed objects are rare.
 
 
 ### Limited ABI stability
-While the real _pimpl idiom_ provides full ABI-stability when changing the hidden type, a rimpled member is only ABI-stable as long as its size does not exceed the buffer size.
+While the real _pimpl idiom_ provides full ABI-stability when changing the hidden type, a rimpled member is only ABI-stable as long as its size does not exceed the buffer-size.
 
-Providing a larger size initially to allow for extension, may reduce this limitation somewhat.
+Providing a larger buffer-size initially to allow for extension, may reduce this limitation somewhat.
 
 
 ## Advantages
@@ -125,4 +137,5 @@ Providing a larger size initially to allow for extension, may reduce this limita
 Since the object is part of the owning class, the optimizer can take advantage of the known layout.
 
 Activating _link-time optimization_ may provide some nice improvements in very special cases.
-[Compiler Explorer Exmpale](https://godbolt.org/z/Pj5hKddWj)
+[Compiler Explorer Exmpale](https://godbolt.org/z/EbaMnKMhj)
+
